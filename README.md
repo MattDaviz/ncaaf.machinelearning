@@ -6,3 +6,5 @@ The app was deployed on Shiny Apps with an intended use for following along with
 https://coachbrains.shinyapps.io/cBKelly/
 
 ![example](http://i.imgur.com/lscqRbb.png)
+
+![example.weights](https://i.gyazo.com/9995318108deb0f08ba4aec0a40f7bb0.png)
