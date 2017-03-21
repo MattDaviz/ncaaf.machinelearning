@@ -1,94 +1,66 @@
+#Set libraries ----------
+library(readr); library(dplyr); library(randomForest)
+
 #Set working directory----------------
-setwd("C:\\Users\\mattd\\Dropbox\\FFL\\CFB\\CFB Play-by-Play Database\\play")
+setwd(".\\data")
 
 #Load Data-----------------
 # Get the files names
-files = list.files(pattern="*.csv")
+files <-  list.files(pattern="*.csv")
 
 # First apply read.csv, then rbind
-train = do.call("rbind", lapply(files, function(x) read.csv(x, stringsAsFactors = FALSE)))
+data <- do.call("rbind", lapply(files, function(x) read_csv(x)))
 
-#Change Play Type to factor
-train$Play.Type <- as.factor(train$Play.Type)
-train$Previous.Play.Type<-as.factor(train$Previous.Play.Type)
-
-#Single Season data loads
-#train <- read.csv("play 11.csv")
-
+# Create new data frame for analysis
+colnames(data) <- make.names(colnames(data), unique=TRUE)
 
 #Clean data--------------------------------
-#Train cleaning
-train <- train[,c(3,4,5,6,7,8,9,10,11,12,13,15,16,17,18,19,20)]
-#Only save Runs and Passes
-train <- droplevels(train[!(train$Play.Type %in% c("ATTEMPT", "FIELD_GOAL", "KICKOFF", "PENALTY", "PUNT", "TIMEOUT", "SACK")),])
-#4th Quarter Models
-#train <- train[which(train$Period.Number == '1'& train$Offense.Points>train$Defense.Points),]
-#train4 <- train[which(train$Offense.Team.Code == '703' & train$Year %in% c(2005,2006,2007,2008,2009,2010)&train$Period.Number =='4'&train$Offense.Points<train$Defense.Points),]
-#train5 <- train[which(train$Offense.Team.Code == '312' & train$Year %in% c(2012,2013)&train$Period.Number =='4'&train$Offense.Points<train$Defense.Points),]
+#Change Play Type to factor and remove all except run/pass and grab only teams coached by Brian Kelly
+bk.df <- data %>% 
+  mutate(Play.Type = as.factor(Play.Type),
+         Previous.Play.Type = as.factor(Previous.Play.Type)) %>% 
+  filter(Play.Type %in% c('PASS', 'RUSH')) %>% 
+  select(Period.Number:Drive.Number, Interceptions:Year) %>% 
+  filter(Offense.Team.Code == '129' & Year %in% c(2005, 2006) |
+           Offense.Team.Code == '140' & Year %in% c(2007, 2008, 2009) |
+           Offense.Team.Code == '513' & Year %in% c(2010, 2011, 2012, 2014))
 
-#Other Quarter Models
-#train <- train[which(train$Period.Number == '1'),]
-#train1 <- train[which(train$Offense.Team.Code == '648' ),]
-#train2 <- train[which(train$Offense.Team.Code == '648' & train$Defense.Team.Code %in% c(196,257,726,736,37,334,430,694)),]
-train4 <- train[which(train$Offense.Team.Code == '129' & train$Year %in% c(2005,2006)&train$Period.Number=='1'),]
-train5 <- train[which(train$Offense.Team.Code == '140' & train$Year %in% c(2007,2008,2009)&train$Period.Number=='1'),]
-train6 <- train[which(train$Offense.Team.Code == '513' & train$Year %in% c(2010,2011,2012,2014)&train$Period.Number=='1'),]
-train7 <- test[which(test$Offense.Team.Code=='513'&test$Defense.Team.Code == '703'&test$Period.Number=='1'),]
-#Combine different team data
-train <- rbind(train4,train5,train6,train7)
+test <- bk.df %>% 
+  filter(Year >= 2014)
 
+train <- bk.df %>% 
+  filter(Year <=)
 
-#Test Cleaning
-test <- read.csv("2015 NEW WEEK 3.csv")
-test <- test[,c(3,4,5,6,7,8,9,10,11,12,13,15,16,17,18,19,20)]
-#Only save run and pass
-test <- droplevels(test[!(test$Play.Type %in% c("ATTEMPT", "FIELD_GOAL",  "KICKOFF", "PENALTY", "PUNT",   "TIMEOUT", "SACK")),])
-#Select specific game to test on
-test <- test[which(test$Offense.Team.Code == '513'),]
-test <- test[which(test$Defense.Team.Code == '746'),]
-#4th Quarter model
-#test <- test[which(test$Period.Number=='4'&test$Offense.Points<test$Defense.Points),]
-#Other Quarter Models
-test <- test[which(test$Period.Number=='1'),]
-#levels(test$Previous.Play.Type) <- levels(train$Previous.Play.Type)
-test[test$Previous.Play.Type == "SACK",]$Previous.Play.Type="PASS"
+train$Play.Type <- factor(train$Play.Type) 
+test$Play.Type <- factor(test$Play.Type)
 
-#Make levels the same for Train and Test
-#levels(test$Play.Type) <- levels(train$Play.Type)
-
-str(train)
 #Random Forest--------------------
-install.packages("randomForest")
-library(randomForest)
 myNtree = 501
 myMtry = 4
 myImportance = TRUE
 set.seed(415)
 #Model set up and run
-playFit.1rf <- randomForest(Play.Type ~ Period.Number + Clock + Offense.Team.Code +
+bk.model <- randomForest(Play.Type ~ Period.Number + Clock + Offense.Team.Code +
                              Defense.Team.Code + Offense.Points + Defense.Points +
                              Down + Distance + Spot + Drive.Number + Interceptions +
-                             Fumbles + Point.Differential + DownXDistance + Previous.Play.Type + Year
-                             ,data = train, ntree = myNtree, mtry = myMtry, importance = myImportance)
-
-#Shiny Test
-playFit.1rf <- randomForest(Play.Type ~ Period.Number + Clock + Offense.Points + Defense.Points +
-                              Down + Distance + Spot + Interceptions +
-                              Fumbles + DownXDistance + Point.Differential + Year
-                            ,data = train, ntree = myNtree, mtry = myMtry, importance = myImportance)
-
-
+                             Fumbles + Point.Differential + DownXDistance + Previous.Play.Type + Year, 
+                         data = train, ntree = myNtree, mtry = myMtry, importance = myImportance)
 
 #Plot error
-#plot(playFit.rf, log="y")
-save(playFit.3rf, file = "Qtr4tieNotreDame.RData")
+plot(bk.model, log="y")
+save(bk.model, file = "BrianKelly.RData")
 
 #Plot variable importance
-varImpPlot(playFit.4tierf)
+varImpPlot(bk.model)
 
 #Create predictions in test tables
-test$pred.PlayType.rf <- predict(playFit.1rf, test)
-table(test$Play.Type, test$pred.PlayType.rf)
+test$pred.Play.Type <- predict(bk.model, test)
+bk.model.results <- data.frame(test$Play.Type, test$pred.Play.Type)
+
+# Analyze accuracy
+bk.model.results %>% 
+  mutate(correct = ifelse(test.Play.Type == test.pred.Play.Type, 1, 0)) %>% 
+  summarize(accuracy = sum(correct, na.rm = TRUE) / n())
 
 #Conditional Inference Tree-----------------
 library(party)
